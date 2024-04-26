@@ -99,5 +99,47 @@ curl -o cni.tgz -fsSL "https://github.com/containernetworking/plugins/releases/d
 mkdir -p "${SYSEXTNAME}/usr/local/bin/cni"
 tar --force-local -xf "cni.tgz" -C "${SYSEXTNAME}/usr/local/bin/cni"
 
+cat > "${SYSEXTNAME}/usr/share/containerd/config.toml" <<-'EOF'
+version = 2
+
+# persistent data location
+root = "/var/lib/containerd"
+# runtime state information
+state = "/run/containerd"
+# set containerd as a subreaper on linux when it is not running as PID 1
+subreaper = true
+# set containerd's OOM score
+oom_score = -999
+disabled_plugins = []
+
+# grpc configuration
+[grpc]
+address = "/run/containerd/containerd.sock"
+# socket uid
+uid = 0
+# socket gid
+gid = 0
+
+[plugins."io.containerd.runtime.v1.linux"]
+# shim binary name/path
+shim = "containerd-shim"
+# runtime binary name/path
+runtime = "runc"
+# do not use a shim when starting containers, saves on memory but
+# live restore is not supported
+no_shim = false
+
+[plugins."io.containerd.grpc.v1.cri"]
+# enable SELinux labeling
+enable_selinux = true
+device_ownership_from_security_context = true
+
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+# setting runc.options unsets parent settings
+runtime_type = "io.containerd.runc.v2"
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+SystemdCgroup = true
+EOF
+
 RELOAD=1 "${SCRIPTFOLDER}"/bake.sh "${SYSEXTNAME}"
 rm -rf "${SYSEXTNAME}"
